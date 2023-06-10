@@ -13,7 +13,8 @@ import DisconnectButton from '../components/DisconnectButton';
 import RequestAirdropButton from '../components/RequestAirdropButton';
 import SignMessageButton from '../components/SignMessageButton';
 import SignTransactionButton from '../components/SignTransactionButton';
-import AnchorCounterButton from '../components/AnchorCounter';
+import AnchorCounterButton from '../components/AnchorCounterButton';
+import AnchorCounterDisplay from '../components/AnchorCounterDisplay';
 
 export default function MainScreen() {
   const {connection} = useConnection();
@@ -44,6 +45,7 @@ export default function MainScreen() {
           {selectedAccount ? (
             <>
               <Section title="Anchor Counter">
+                <AnchorCounterDisplay />
                 <AnchorCounterButton />
               </Section>
 
