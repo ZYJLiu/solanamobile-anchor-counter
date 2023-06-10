@@ -7,10 +7,12 @@ import {
 import {clusterApiUrl, Connection, Transaction} from '@solana/web3.js';
 import {useAuthorization} from './providers/AuthorizationProvider';
 import {useProgram} from './providers/AnchorProvider';
+import {useConnection} from './providers/ConnectionProvider';
 
 export default function AnchorCounterButton() {
   const {authorizeSession} = useAuthorization();
   const {program, counterAddress} = useProgram();
+  const {connection} = useConnection();
   const [isIncrement, setIsIncrement] = useState(false);
   const [isDecrement, setIsDecrement] = useState(false);
 
@@ -40,13 +42,9 @@ export default function AnchorCounterButton() {
     if (!program || !counterAddress) return;
 
     return await transact(async (wallet: Web3MobileWallet) => {
-      const devnetConnection = new Connection(
-        clusterApiUrl('devnet'),
-        'confirmed',
-      );
       const [authResult, blockhashResult] = await Promise.all([
         authorizeSession(wallet),
-        devnetConnection.getLatestBlockhash(),
+        connection.getLatestBlockhash(),
       ]);
 
       let transactionInstruction;
