@@ -1,4 +1,4 @@
-import {Program, AnchorProvider, setProvider, Wallet} from '@coral-xyz/anchor';
+import {Program, AnchorProvider, setProvider} from '@coral-xyz/anchor';
 import {AnchorCounter, IDL} from '../../idl/anchor-counter';
 import {
   useState,
@@ -9,25 +9,25 @@ import {
   useMemo,
   useEffect,
 } from 'react';
-import {useAuthorization} from './AuthorizationProvider';
 import {useConnection} from './ConnectionProvider';
-import {transact} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import {Keypair, PublicKey, Transaction} from '@solana/web3.js';
+import {Keypair, PublicKey} from '@solana/web3.js';
 
 export type ProgramContextType = {
   program: Program<AnchorCounter> | null;
+  counterAddress: PublicKey | null;
 };
 
 export const ProgramContext = createContext<ProgramContextType>({
   program: null,
+  counterAddress: null,
 });
 
 export function ProgramProvider({children}: {children: ReactNode}) {
-  // const {selectedAccount, authorizeSession} = useAuthorization();
   const {connection} = useConnection();
   const [program, setProgram] = useState<Program<AnchorCounter> | null>(null);
+  const [counterAddress, setCounterAddress] = useState<PublicKey | null>(null);
 
-  const setupProgram = useCallback(async () => {
+  const setup = useCallback(async () => {
     const programId = new PublicKey(
       'ALeaCzuJpZpoCgTxMjJbNjREVqSwuvYFRZUfc151AKHU',
     );
@@ -40,24 +40,32 @@ export function ProgramProvider({children}: {children: ReactNode}) {
 
     const provider = new AnchorProvider(connection, MockWallet, {});
     setProvider(provider);
+
     const programInstance = new Program<AnchorCounter>(
       IDL,
       programId,
       provider,
     );
 
+    const [counterAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from('counter')],
+      programId,
+    );
+
     setProgram(programInstance);
+    setCounterAddress(counterAddress);
   }, [connection]);
 
   useEffect(() => {
-    setupProgram();
-  }, [setupProgram]);
+    setup();
+  }, [setup]);
 
   const value = useMemo(
     () => ({
       program,
+      counterAddress,
     }),
-    [program],
+    [program, counterAddress],
   );
 
   return (

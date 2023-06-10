@@ -1,127 +1,107 @@
-import React, {useState, useCallback, useEffect} from 'react';
-import {Alert, Button} from 'react-native';
-import {fromUint8Array} from 'js-base64';
+import React, {useState} from 'react';
+import {Alert, Button, View} from 'react-native';
 import {
   transact,
   Web3MobileWallet,
 } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import {
-  Keypair,
   clusterApiUrl,
   Connection,
-  SystemProgram,
   Transaction,
   PublicKey,
-  VersionedTransaction,
 } from '@solana/web3.js';
-
 import {useAuthorization} from './providers/AuthorizationProvider';
 import {useProgram} from './providers/AnchorProvider';
-import {Program, AnchorProvider, setProvider} from '@coral-xyz/anchor';
-import {AnchorCounter, IDL} from '../idl/anchor-counter';
-import {useConnection} from './providers/ConnectionProvider';
 
-export const APP_IDENTITY = {
-  name: 'Solana dApp Scaffold',
-};
+export const APP_IDENTITY = {name: 'Solana dApp Scaffold'};
 
 export default function AnchorCounterButton() {
-  const {authorizeSession, selectedAccount} = useAuthorization();
-  const {connection} = useConnection();
+  const {authorizeSession} = useAuthorization();
+  const {program, counterAddress} = useProgram();
+  const [isSigningIncrement, setIsSigningIncrement] = useState(false);
+  const [isSigningDecrement, setIsSigningDecrement] = useState(false);
 
-  const [program, setProgram] = useState<Program<AnchorCounter> | null>(null);
+  const incrementCounter = async () => {
+    setIsSigningIncrement(true);
+    try {
+      await transactTransaction('increment');
+      setIsSigningIncrement(false);
+    } catch (error) {
+      console.log(error);
+      setIsSigningIncrement(false);
+    }
+  };
 
-  // const {program} = useProgram();
-  const [signingInProgress, setSigningInProgress] = useState(false);
+  const decrementCounter = async () => {
+    setIsSigningDecrement(true);
+    try {
+      await transactTransaction('decrement');
+      setIsSigningDecrement(false);
+    } catch (error) {
+      console.log(error);
+      setIsSigningDecrement(false);
+    }
+  };
 
-  const signTransaction = useCallback(async () => {
+  const transactTransaction = async (actionType: string) => {
+    if (!program || !counterAddress) return;
+
     return await transact(async (wallet: Web3MobileWallet) => {
-      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-
-      // First, request for authorization from the wallet and fetch the latest
-      // blockhash for building the transaction.
-      const [authorizationResult, latestBlockhash] = await Promise.all([
+      const devnetConnection = new Connection(
+        clusterApiUrl('devnet'),
+        'confirmed',
+      );
+      const [authResult, blockhashResult] = await Promise.all([
         authorizeSession(wallet),
-        connection.getLatestBlockhash(),
+        devnetConnection.getLatestBlockhash(),
       ]);
 
-      const programId = new PublicKey(
-        'ALeaCzuJpZpoCgTxMjJbNjREVqSwuvYFRZUfc151AKHU',
-      );
+      let transactionInstruction;
+      if (actionType === 'increment') {
+        transactionInstruction = await program.methods
+          .increment()
+          .accounts({
+            counter: counterAddress,
+            user: authResult.publicKey,
+          })
+          .instruction();
+      } else if (actionType === 'decrement') {
+        transactionInstruction = await program.methods
+          .decrement()
+          .accounts({
+            counter: counterAddress,
+            user: authResult.publicKey,
+          })
+          .instruction();
+      } else {
+        throw new Error('Invalid action type');
+      }
 
-      const [counter] = PublicKey.findProgramAddressSync(
-        [Buffer.from('counter')],
-        programId,
-      );
+      const transaction = new Transaction({
+        ...blockhashResult,
+        feePayer: authResult.publicKey,
+      }).add(transactionInstruction);
 
-      const ix = await program!.methods
-        .increment()
-        .accounts({
-          counter: counter,
-          user: authorizationResult.publicKey,
-        })
-        .instruction();
-
-      const tx = new Transaction({
-        ...latestBlockhash,
-        feePayer: authorizationResult.publicKey,
-      }).add(ix);
-
-      // Sign a transaction and receive
       const signedTransactions = await wallet.signAndSendTransactions({
-        transactions: [tx],
+        transactions: [transaction],
       });
 
-      // const txSig = connection.sendTransaction(signTransactions[0]);
-
       console.log(signedTransactions);
-
-      // return signedTransactions[0];
     });
-  }, [authorizeSession, program]);
-
-  useEffect(() => {
-    if (!selectedAccount) return;
-    const MockWallet = {
-      signTransaction: () => Promise.reject(),
-      signAllTransactions: () => Promise.reject(),
-      publicKey: Keypair.generate().publicKey,
-    };
-
-    const programId = new PublicKey(
-      'ALeaCzuJpZpoCgTxMjJbNjREVqSwuvYFRZUfc151AKHU',
-    );
-
-    const provider = new AnchorProvider(connection, MockWallet, {});
-    setProvider(provider);
-    const program = new Program<AnchorCounter>(IDL, programId, provider);
-
-    setProgram(program);
-  }, [connection, selectedAccount]);
+  };
 
   return (
-    <Button
-      title="Anchor Counter"
-      disabled={signingInProgress}
-      onPress={async () => {
-        if (signingInProgress) {
-          return;
-        }
-        setSigningInProgress(true);
-        try {
-          const signedTransaction = await signTransaction();
-          setTimeout(async () => {
-            Alert.alert(
-              'Transaction signed!',
-              'View SignTransactionButton.tsx for implementation.',
-              [{text: 'Ok', style: 'cancel'}],
-            );
-          }, 100);
-          // console.log(fromUint8Array(signedTransaction.serialize()));
-        } finally {
-          setSigningInProgress(false);
-        }
-      }}
-    />
+    <View>
+      <Button
+        title="Increment"
+        disabled={isSigningIncrement}
+        onPress={incrementCounter}
+      />
+      <Button
+        title="Decrement"
+        disabled={isSigningDecrement}
+        onPress={decrementCounter}
+      />
+    </View>
   );
 }
