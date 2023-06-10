@@ -1,21 +1,22 @@
 import React, {useState} from 'react';
-import {Alert, Button, View} from 'react-native';
+import {Button, View} from 'react-native';
 import {
   transact,
   Web3MobileWallet,
 } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import {clusterApiUrl, Connection, Transaction} from '@solana/web3.js';
+import {Transaction} from '@solana/web3.js';
 import {useAuthorization} from './providers/AuthorizationProvider';
 import {useProgram} from './providers/AnchorProvider';
 import {useConnection} from './providers/ConnectionProvider';
 
 export default function AnchorCounterButton() {
-  const {authorizeSession} = useAuthorization();
-  const {program, counterAddress} = useProgram();
-  const {connection} = useConnection();
+  const {authorizeSession} = useAuthorization(); // Use the custom hook to get the authorizeSession function from the AuthorizationProvider.
+  const {program, counterAddress} = useProgram(); // Use the custom hook to get the program and counterAddress from the AnchorProvider.
+  const {connection} = useConnection(); // Use the custom hook to get the connection from the ConnectionProvider.
   const [isIncrement, setIsIncrement] = useState(false);
   const [isDecrement, setIsDecrement] = useState(false);
 
+  // Function to send transaction to increment counter account.
   const incrementCounter = async () => {
     setIsIncrement(true);
     try {
@@ -27,6 +28,7 @@ export default function AnchorCounterButton() {
     }
   };
 
+  // Function to send transaction to decrement counter account.
   const decrementCounter = async () => {
     setIsDecrement(true);
     try {
@@ -38,6 +40,7 @@ export default function AnchorCounterButton() {
     }
   };
 
+  // Function to create and submit a transaction.
   const createAndSubmitTransaction = async (actionType: string) => {
     if (!program || !counterAddress) return;
 
@@ -49,6 +52,7 @@ export default function AnchorCounterButton() {
 
       let transactionInstruction;
 
+      // Based on the actionType, create a transaction instruction to either increment or decrement the counter.
       switch (actionType) {
         case 'increment':
           transactionInstruction = await program.methods
@@ -74,16 +78,19 @@ export default function AnchorCounterButton() {
           throw new Error('Invalid action type');
       }
 
+      // Create a new transaction with the blockhash and the payer's public key.
+      // Then add the transaction instruction to it.
       const transaction = new Transaction({
         ...blockhashResult,
         feePayer: authResult.publicKey,
       }).add(transactionInstruction);
 
-      const signedTransactions = await wallet.signAndSendTransactions({
+      // Request wallet to sign and send the transaction, then log the transaction signature.
+      const txSig = await wallet.signAndSendTransactions({
         transactions: [transaction],
       });
 
-      console.log(signedTransactions);
+      console.log(txSig);
     });
   };
 
